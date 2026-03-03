@@ -39,9 +39,9 @@ function inputsForLevels(levels: number) {
 }
 
 // ── Flip-Flop state ──────────────────────────────────────────────────────────
+// Note: 's' is removed — it is derived from finalOutput (circuit output)
 interface FFState {
   q: boolean
-  s: boolean
   r: boolean
   pos: { x: number; y: number }
   dragging: boolean
@@ -60,26 +60,21 @@ export function CircuitSimulator() {
 
   // Flip-Flop
   const [ff, setFF] = useState<FFState>({
-    q: false, s: false, r: false,
+    q: false, r: false,
     pos: { x: 200, y: 80 },
     dragging: false,
     dragOffset: { dx: 0, dy: 0 },
   })
   const svgRef = useRef<SVGSVGElement>(null)
 
-  // SR latch logic: update Q when S or R change
-  useEffect(() => {
-    setFF((prev) => {
-      if (prev.s && !prev.r) return { ...prev, q: true }   // Set
-      if (!prev.s && prev.r) return { ...prev, q: false }  // Reset
-      if (prev.s && prev.r)  return { ...prev, q: false }  // Invalid → 0
-      return prev                                           // Hold
-    })
-  }, [ff.s, ff.r])
-
-  const toggleFFInput = useCallback((pin: "s" | "r") => {
-    setFF((prev) => ({ ...prev, [pin]: !prev[pin] }))
+  // SR latch logic: S is driven by finalOutput (circuit), R is manual
+  // We derive S from finalOutput below — the effect reacts to it
+  const resetFF = useCallback(() => {
+    setFF((prev) => ({ ...prev, r: true, q: false }))
+    // After a tick, release R so it's ready for the next Set
+    setTimeout(() => setFF((prev) => ({ ...prev, r: false })), 150)
   }, [])
+
 
   // Drag handlers
   const onFFMouseDown = useCallback((e: React.MouseEvent) => {
@@ -264,6 +259,18 @@ export function CircuitSimulator() {
           circuitLevels[circuitLevels.length - 1].gates.length - 1
         ]?.output
       : null
+
+  // SR logic: when finalOutput (S) goes HIGH and R is not active -> Set Q=1
+  // Q holds its value when S goes LOW (memory behaviour)
+  useEffect(() => {
+    if (finalOutput === null) return
+    setFF((prev) => {
+      if (finalOutput && !prev.r) return { ...prev, q: true }  // Set
+      // R handled by resetFF directly — no change here on S=0
+      return prev
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finalOutput])
 
   return (
     <div className="flex flex-col gap-6">
@@ -588,18 +595,39 @@ export function CircuitSimulator() {
               />
             )}
 
+            {/* ── Wire: OutputNode → FF S pin ── */}
+            {finalOutput !== null && (() => {
+              const outputNodeX = getLevelX(circuitLevels.length) + 20
+              const outputNodeY = svgHeight / 2
+              // S pin is at top-left of the FF body
+              const hw = 50  // half of FF width=100
+              const hh = 40  // half of FF height=80
+              const pinLen = 22
+              const pinSY = ff.pos.y - hh * 0.45
+              const pinSX = ff.pos.x - hw - pinLen - 22
+              return (
+                <Wire
+                  x1={outputNodeX + 30}
+                  y1={outputNodeY}
+                  x2={pinSX}
+                  y2={pinSY}
+                  active={finalOutput}
+                  horizontal={false}
+                />
+              )
+            })()}
+
             {/* ── Draggable SR Flip-Flop ── */}
             <FlipFlopSVG
               x={ff.pos.x}
               y={ff.pos.y}
               q={ff.q}
-              s={ff.s}
+              s={finalOutput ?? false}
               r={ff.r}
               dragging={ff.dragging}
               onMouseDown={onFFMouseDown}
               onTouchStart={onFFTouchStart}
-              onToggleS={() => toggleFFInput("s")}
-              onToggleR={() => toggleFFInput("r")}
+              onToggleR={resetFF}
             />
           </svg>
         </div>
@@ -657,51 +685,106 @@ export function CircuitSimulator() {
 
           {/* Final result */}
           {finalOutput !== null && (
-            <div
-              className="rounded-lg border-2 p-6 flex flex-col items-center justify-center gap-2 min-w-[180px] transition-all duration-300"
-              style={{
-                borderColor: finalOutput
-                  ? "var(--signal-high)"
-                  : "var(--signal-low)",
-                backgroundColor: finalOutput
-                  ? "color-mix(in oklch, var(--signal-high) 5%, transparent)"
-                  : "color-mix(in oklch, var(--signal-low) 5%, transparent)",
-              }}
-            >
-              <span className="text-[10px] font-mono font-bold text-muted-foreground tracking-widest uppercase">
-                Resultado Final
-              </span>
-              <span
-                className="inline-block w-10 h-10 rounded-full"
+            <div className="flex flex-col gap-3">
+              {/* Circuit output */}
+              <div
+                className="rounded-lg border-2 p-6 flex flex-col items-center justify-center gap-2 min-w-[180px] transition-all duration-300"
                 style={{
+                  borderColor: finalOutput
+                    ? "var(--signal-high)"
+                    : "var(--signal-low)",
                   backgroundColor: finalOutput
-                    ? "var(--signal-high)"
-                    : "var(--signal-low)",
-                  boxShadow: finalOutput
-                    ? "0 0 20px var(--signal-high), 0 0 40px var(--signal-high)"
-                    : "0 0 20px var(--signal-low), 0 0 40px var(--signal-low)",
-                }}
-              />
-              <span
-                className="text-3xl font-mono font-bold"
-                style={{
-                  color: finalOutput
-                    ? "var(--signal-high)"
-                    : "var(--signal-low)",
+                    ? "color-mix(in oklch, var(--signal-high) 5%, transparent)"
+                    : "color-mix(in oklch, var(--signal-low) 5%, transparent)",
                 }}
               >
-                {finalOutput ? "1" : "0"}
-              </span>
-              <span
-                className="text-xs font-mono"
+                <span className="text-[10px] font-mono font-bold text-muted-foreground tracking-widest uppercase">
+                  Resultado Final
+                </span>
+                <span
+                  className="inline-block w-10 h-10 rounded-full"
+                  style={{
+                    backgroundColor: finalOutput
+                      ? "var(--signal-high)"
+                      : "var(--signal-low)",
+                    boxShadow: finalOutput
+                      ? "0 0 20px var(--signal-high), 0 0 40px var(--signal-high)"
+                      : "0 0 20px var(--signal-low), 0 0 40px var(--signal-low)",
+                  }}
+                />
+                <span
+                  className="text-3xl font-mono font-bold"
+                  style={{
+                    color: finalOutput
+                      ? "var(--signal-high)"
+                      : "var(--signal-low)",
+                  }}
+                >
+                  {finalOutput ? "1" : "0"}
+                </span>
+                <span
+                  className="text-xs font-mono"
+                  style={{
+                    color: finalOutput
+                      ? "var(--signal-high)"
+                      : "var(--signal-low)",
+                  }}
+                >
+                  {finalOutput ? "VERDADERO" : "FALSO"}
+                </span>
+              </div>
+
+              {/* Flip-Flop state */}
+              <div
+                className="rounded-lg border-2 p-4 flex flex-col items-center justify-center gap-2 min-w-[180px] transition-all duration-300"
                 style={{
-                  color: finalOutput
+                  borderColor: ff.q
                     ? "var(--signal-high)"
-                    : "var(--signal-low)",
+                    : "var(--border)",
+                  backgroundColor: ff.q
+                    ? "color-mix(in oklch, var(--signal-high) 5%, transparent)"
+                    : "transparent",
                 }}
               >
-                {finalOutput ? "VERDADERO" : "FALSO"}
-              </span>
+                <span className="text-[10px] font-mono font-bold text-muted-foreground tracking-widest uppercase">
+                  FF Guarda: Q
+                </span>
+                <div className="flex items-center gap-3">
+                  <span
+                    className="inline-block w-8 h-8 rounded-full transition-all duration-300"
+                    style={{
+                      backgroundColor: ff.q ? "var(--signal-high)" : "var(--signal-low)",
+                      boxShadow: ff.q
+                        ? "0 0 16px var(--signal-high), 0 0 32px var(--signal-high)"
+                        : "0 0 8px var(--signal-low)",
+                    }}
+                  />
+                  <span
+                    className="text-2xl font-mono font-bold"
+                    style={{ color: ff.q ? "var(--signal-high)" : "var(--signal-low)" }}
+                  >
+                    {ff.q ? "1" : "0"}
+                  </span>
+                </div>
+                <div className="flex gap-2 mt-1 text-[9px] font-mono text-muted-foreground">
+                  <span>S={finalOutput ? "1" : "0"}</span>
+                  <span>R={ff.r ? "1" : "0"}</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={resetFF}
+                  disabled={!ff.q}
+                  className="mt-1 font-mono text-[10px] h-7 px-3 rounded-md"
+                  style={{
+                    color: "var(--signal-low)",
+                    borderColor: "color-mix(in oklch, var(--signal-low) 40%, transparent)",
+                    opacity: ff.q ? 1 : 0.4,
+                  }}
+                >
+                  ↺ Reset FF
+                </Button>
+              </div>
             </div>
           )}
         </div>

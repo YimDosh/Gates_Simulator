@@ -240,12 +240,11 @@ interface FlipFlopProps {
   width?: number
   height?: number
   q: boolean          // current Q state
-  s: boolean          // Set input
-  r: boolean          // Reset input
+  s: boolean          // Set input — driven by circuit finalOutput
+  r: boolean          // Reset input — manual
   dragging?: boolean
   onMouseDown?: (e: React.MouseEvent) => void
   onTouchStart?: (e: React.TouchEvent) => void
-  onToggleS?: () => void
   onToggleR?: () => void
 }
 
@@ -256,7 +255,6 @@ export function FlipFlopSVG({
   dragging = false,
   onMouseDown,
   onTouchStart,
-  onToggleS,
   onToggleR,
 }: FlipFlopProps) {
   const qBar = !q
@@ -346,20 +344,19 @@ export function FlipFlopSVG({
       </text>
 
       {/* ── Input pins (left side) ── */}
-      {/* S pin */}
+      {/* S pin — connected from circuit output (read-only) */}
       <line x1={bodyX - pinLen} y1={pinSY} x2={bodyX} y2={pinSY}
-        stroke={colorS} strokeWidth={s ? 2 : 1.2} opacity={s ? 1 : 0.4} />
-      {/* S toggle button */}
-      <circle
-        cx={bodyX - pinLen - 10} cy={pinSY} r={9}
+        stroke={colorS} strokeWidth={s ? 2.2 : 1.2} opacity={s ? 1 : 0.4} />
+      {/* S indicator (not interactive — driven by circuit) */}
+      <rect
+        x={bodyX - pinLen - 22} y={pinSY - 9}
+        width={18} height={18} rx={3}
         fill={s ? "color-mix(in oklch, var(--signal-high) 18%, transparent)" : "var(--gate-fill)"}
-        stroke={colorS} strokeWidth={2}
-        style={{ cursor: "pointer" }}
-        onClick={(e) => { e.stopPropagation(); onToggleS?.() }}
-        onMouseDown={(e) => e.stopPropagation()}
+        stroke={colorS} strokeWidth={1.5}
+        opacity={s ? 1 : 0.55}
       />
       <text
-        x={bodyX - pinLen - 10} y={pinSY + 4}
+        x={bodyX - pinLen - 13} y={pinSY + 4}
         textAnchor="middle" className="font-mono font-bold"
         style={{ fontSize: "10px", fill: colorS, pointerEvents: "none" }}
       >
@@ -372,6 +369,14 @@ export function FlipFlopSVG({
         style={{ fontSize: "9px", fill: "var(--muted-foreground)", pointerEvents: "none" }}
       >
         S
+      </text>
+      {/* "from circuit" micro-label */}
+      <text
+        x={bodyX - pinLen - 13} y={pinSY - 13}
+        textAnchor="middle"
+        style={{ fontSize: "6px", fill: "var(--muted-foreground)", opacity: 0.7, pointerEvents: "none" }}
+      >
+        circuito
       </text>
 
       {/* R pin */}
