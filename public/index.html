@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulador de Circuitos Logicos</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+      --bg: #141820;
+      --bg-card: #1a1f2b;
+      --bg-secondary: #212736;
+      --fg: #e8eaf0;
+      --fg-muted: #6b7280;
+      --border: #2a3040;
+      --primary: #3b9ec9;
+      --wire-active: #4aadda;
+      --wire-inactive: #3a4050;
+      --gate-fill: #1e2430;
+      --gate-stroke: #4a5570;
+      --signal-high: #34d399;
+      --signal-low: #ef6b4a;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.5;
+    }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+
+    /* Header */
+    .header { margin-bottom: 2rem; display: flex; align-items: center; gap: 0.75rem; }
+    .header-icon {
+      width: 36px; height: 36px;
+      border: 1px solid rgba(59,158,201,0.25);
+      background: rgba(59,158,201,0.05);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .header h1 { font-size: 1.5rem; font-weight: 700; }
+    .header p { font-size: 0.8rem; color: var(--fg-muted); font-family: 'JetBrains Mono', monospace; }
+
+    /* Panels */
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+    .panel-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-bottom: 1rem;
+    }
+
+    .layout-row { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; }
+    .layout-row > .panel { flex: 1; min-width: 220px; }
+    .layout-row > .panel:last-child { flex: 2; }
+
+    /* Level selector */
+    .level-selector { display: flex; align-items: center; gap: 1rem; }
+    .level-btn {
+      width: 40px; height: 40px;
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+      color: var(--fg);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px; font-weight: 700;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .level-btn:hover:not(:disabled) { background: var(--border); }
+    .level-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .level-display {
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .level-number {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 2.5rem; font-weight: 700; color: var(--primary); line-height: 1;
+    }
+    .level-info {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--fg-muted);
+    }
+
+    /* Gate selectors */
+    .gates-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .gate-selects { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+    .gate-select-group { display: flex; flex-direction: column; gap: 4px; }
+    .gate-select-group label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.1em;
+    }
+    select {
+      background: var(--bg-secondary);
+      color: var(--fg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      cursor: pointer;
+      outline: none;
+      appearance: auto;
+    }
+    select:focus { border-color: var(--primary); }
+
+    /* Input buttons */
+    .inputs-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+    .input-actions { display: flex; gap: 0.5rem; }
+    .action-btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; font-weight: 600;
+      padding: 4px 10px; height: 28px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--fg-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .action-btn:hover { background: var(--bg-secondary); }
+    .action-btn.high { color: var(--signal-high); border-color: rgba(52,211,153,0.3); }
+    .action-btn.low { color: var(--signal-low); border-color: rgba(239,107,74,0.3); }
+
+    .inputs-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .input-toggle {
+      width: 44px; height: 44px;
+      border: 2px solid;
+      border-radius: 6px;
+      background: transparent;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px; font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .input-toggle.on {
+      border-color: var(--signal-high);
+      color: var(--signal-high);
+      background: rgba(52,211,153,0.1);
+      box-shadow: 0 0 10px rgba(52,211,153,0.35);
+    }
+    .input-toggle.off {
+      border-color: var(--signal-low);
+      color: var(--signal-low);
+      background: rgba(239,107,74,0.1);
+    }
+
+    /* SVG area */
+    .svg-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow-x: auto;
+      margin-bottom: 1rem;
+    }
+
+    /* Results */
+    .results-row {
+      display: flex; gap: 1rem; flex-wrap: wrap;
+    }
+    .results-partial { flex: 1; min-width: 300px; }
+    .results-final { min-width: 180px; }
+
+    .partial-level { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+    .partial-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; font-weight: 700; color: var(--fg-muted);
+      width: 28px; text-transform: uppercase;
+    }
+    .partial-type {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--fg-muted); width: 48px;
+    }
+    .partial-gates { display: flex; flex-wrap: wrap; gap: 8px; }
+    .partial-gate { display: flex; align-items: center; gap: 5px; }
+    .led {
+      width: 12px; height: 12px; border-radius: 50%;
+      display: inline-block;
+    }
+    .led.on { background: var(--signal-high); box-shadow: 0 0 6px var(--signal-high); }
+    .led.off { background: var(--signal-low); box-shadow: 0 0 6px var(--signal-low); }
+    .partial-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; font-weight: 700;
+    }
+    .partial-val.on { color: var(--signal-high); }
+    .partial-val.off { color: var(--signal-low); }
+
+    .final-panel {
+      border-width: 2px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.5rem; padding: 1.5rem;
+      transition: all 0.3s;
+    }
+    .final-panel.on { border-color: var(--signal-high); background: rgba(52,211,153,0.04); }
+    .final-panel.off { border-color: var(--signal-low); background: rgba(239,107,74,0.04); }
+    .final-led {
+      width: 40px; height: 40px; border-radius: 50%;
+    }
+    .final-led.on { background: var(--signal-high); box-shadow: 0 0 20px var(--signal-high), 0 0 40px var(--signal-high); }
+    .final-led.off { background: var(--signal-low); box-shadow: 0 0 20px var(--signal-low), 0 0 40px var(--signal-low); }
+    .final-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 2rem; font-weight: 700;
+    }
+    .final-value.on { color: var(--signal-high); }
+    .final-value.off { color: var(--signal-low); }
+    .final-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+    .final-label.on { color: var(--signal-high); }
+    .final-label.off { color: var(--signal-low); }
+
+    /* Gate reference */
+    .ref-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.75rem;
+    }
+    .ref-card {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      background: rgba(33,39,54,0.5);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem;
+    }
+    .ref-name { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; }
+    .ref-desc {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px; color: var(--fg-muted); text-align: center; line-height: 1.4;
+    }
+
+    .footer {
+      margin-top: 3rem; padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--fg-muted);
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-icon">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <path d="M2 7h5a4 4 0 0 1 0 8H2V7z" stroke="#3b9ec9" stroke-width="1.5"/>
+        <line x1="11" y1="11" x2="16" y2="11" stroke="#3b9ec9" stroke-width="1.5"/>
+        <circle cx="18" cy="11" r="2.5" fill="none" stroke="#3b9ec9" stroke-width="1.5"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Circuitos Logicos</h1>
+      <p class="mono"></p>
+    </div>
+  </div>
+
+  <!-- Gate reference -->
+  <div class="panel" style="margin-bottom:1rem" id="gateReference"></div>
+
+  <!-- Controls row -->
+  <div class="layout-row">
+    <div class="panel">
+      <div class="panel-title">Niveles del Circuito</div>
+      <div class="level-selector">
+        <button class="level-btn" id="btnDecLevel">-</button>
+        <div class="level-display">
+          <span class="level-number" id="levelNum">3</span>
+          <span class="level-info" id="levelInfo">8 entradas</span>
+        </div>
+        <button class="level-btn" id="btnIncLevel">+</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="gates-header">
+        <div class="panel-title" style="margin-bottom:0">Compuerta por Nivel</div>
+        <select id="allGatesSelect" style="height:28px;font-size:10px">
+          <option value="" selected disabled>Todas igual</option>
+          <option value="AND">AND</option>
+          <option value="OR">OR</option>
+          <option value="NAND">NAND</option>
+          <option value="NOR">NOR</option>
+          <option value="XOR">XOR</option>
+          <option value="XNOR">XNOR</option>
+        </select>
+      </div>
+      <div class="gate-selects" id="gateSelects"></div>
+    </div>
+  </div>
+
+  <!-- Inputs -->
+  <div class="panel" style="margin-bottom:1rem">
+    <div class="inputs-header">
+      <div class="panel-title" style="margin-bottom:0">Entradas Binarias (<span id="inputCount">8</span>)</div>
+      <div class="input-actions">
+        <button class="action-btn high" id="btnAll1">Todo 1</button>
+        <button class="action-btn low" id="btnAll0">Todo 0</button>
+        <button class="action-btn" id="btnRandom">Aleatorio</button>
+      </div>
+    </div>
+    <div class="inputs-grid" id="inputsGrid"></div>
+  </div>
+
+  <!-- SVG circuit -->
+  <div class="svg-container" id="svgContainer"></div>
+
+  <!-- Results -->
+  <div class="results-row" id="resultsRow" style="display:none">
+    <div class="panel results-partial" id="partialResults"></div>
+    <div class="panel results-final final-panel" id="finalResult"></div>
+  </div>
+
+  <div class="footer">
+    &mdash;
+  </div>
+</div>
+
+<script>
+// -------- STATE --------
+const GATE_TYPES = ["AND", "OR", "NAND", "NOR", "XOR", "XNOR"];
+const gateFn = {
+  AND:  (a,b) => a && b,
+  OR:   (a,b) => a || b,
+  NAND: (a,b) => !(a && b),
+  NOR:  (a,b) => !(a || b),
+  XOR:  (a,b) => a !== b,
+  XNOR: (a,b) => a === b,
+};
+const gateDescriptions = {
+  AND:  "1 solo si ambas entradas son 1",
+  OR:   "1 si al menos una entrada es 1",
+  NAND: "0 solo si ambas entradas son 1",
+  NOR:  "1 solo si ambas entradas son 0",
+  XOR:  "1 si las entradas son diferentes",
+  XNOR: "1 si las entradas son iguales",
+};
+
+let numLevels = 3;
+let numInputs = Math.pow(2, numLevels);
+let inputs = Array.from({length: numInputs}, () => Math.random() > 0.5);
+let levelTypes = ["AND", "OR", "NAND"];
+let circuitLevels = [];
+
+// -------- GATE REFERENCE --------
+function buildGateReference() {
+  const el = document.getElementById("gateReference");
+  let html = '<div class="panel-title">Referencia de Compuertas</div><div class="ref-grid">';
+  GATE_TYPES.forEach(t => {
+    html += `<div class="ref-card">
+      <svg width="90" height="58" viewBox="0 0 90 58">${drawGateSVGMarkup(t, 45, 29, 50, 36, true)}</svg>
+      <span class="ref-name">${t}</span>
+      <span class="ref-desc">${gateDescriptions[t]}</span>
+    </div>`;
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// -------- DRAW GATE MARKUP (returns SVG string) --------
+function drawGateSVGMarkup(type, x, y, w, h, isRef) {
+  const halfW = w / 2;
+  const neg = type === "NAND" || type === "NOR" || type === "XNOR";
+  let body = "";
+
+  // Gate body
+  if (type === "AND" || type === "NAND") {
+    body += `<path d="M ${x-halfW} ${y-h/2} L ${x} ${y-h/2} A ${halfW} ${h/2} 0 0 1 ${x} ${y+h/2} L ${x-halfW} ${y+h/2} Z" fill="var(--gate-fill)" stroke="var(--gate-stroke)" stroke-width="2"/>`;
+  } else if (type === "OR" || type === "NOR") {
+    body += `<path d="M ${x-halfW} ${y-h/2} Q ${x-halfW+w*0.15} ${y}, ${x-halfW} ${y+h/2} Q ${x+halfW*0.2} ${y+h/2}, ${x+halfW} ${y} Q ${x+halfW*0.2} ${y-h/2}, ${x-halfW} ${y-h/2} Z" fill="var(--gate-fill)" stroke="var(--gate-stroke)" stroke-width="2"/>`;
+  } else {
+    // XOR / XNOR
+    body += `<path d="M ${x-halfW-6} ${y-h/2} Q ${x-halfW+w*0.15-6} ${y}, ${x-halfW-6} ${y+h/2}" fill="none" stroke="var(--gate-stroke)" stroke-width="2"/>`;
+    body += `<path d="M ${x-halfW} ${y-h/2} Q ${x-halfW+w*0.15} ${y}, ${x-halfW} ${y+h/2} Q ${x+halfW*0.2} ${y+h/2}, ${x+halfW} ${y} Q ${x+halfW*0.2} ${y-h/2}, ${x-halfW} ${y-h/2} Z" fill="var(--gate-fill)" stroke="var(--gate-stroke)" stroke-width="2"/>`;
+  }
+
+  // Negation bubble
+  if (neg) {
+    body += `<circle cx="${x+halfW+6}" cy="${y}" r="5" fill="var(--gate-fill)" stroke="var(--gate-stroke)" stroke-width="2"/>`;
+  }
+
+  if (!isRef) {
+    // Input pins
+    const tY = y - h*0.25, bY = y + h*0.25;
+    body += `<line x1="${x-halfW-10}" y1="${tY}" x2="${x-halfW}" y2="${tY}" stroke="var(--gate-stroke)" stroke-width="2"/>`;
+    body += `<line x1="${x-halfW-10}" y1="${bY}" x2="${x-halfW}" y2="${bY}" stroke="var(--gate-stroke)" stroke-width="2"/>`;
+    // Output pin
+    const outX = x + halfW + (neg ? 11 : 0);
+    const endX = x + halfW + (neg ? 15 : 10);
+    body += `<line x1="${outX}" y1="${y}" x2="${endX}" y2="${y}" stroke="var(--gate-stroke)" stroke-width="2"/>`;
+  }
+
+  // Label
+  const labelOff = type.length > 3 ? 14 : 10;
+  body += `<text x="${x - labelOff}" y="${y+4}" font-family="'JetBrains Mono',monospace" font-size="10" font-weight="700" fill="var(--fg)">${type}</text>`;
+
+  return body;
+}
+
+// -------- COMPUTE CIRCUIT --------
+function computeCircuit() {
+  circuitLevels = [];
+  if (inputs.length <= 1) return;
+  let current = [...inputs];
+  for (let lv = 0; lv < numLevels && current.length > 1; lv++) {
+    const gType = levelTypes[lv] || "AND";
+    const gates = [];
+    const next = [];
+    for (let i = 0; i < current.length; i += 2) {
+      if (i + 1 < current.length) {
+        const out = gateFn[gType](current[i], current[i+1]);
+        gates.push({ inputs: [current[i], current[i+1]], type: gType, output: out });
+        next.push(out);
+      } else {
+        gates.push({ inputs: [current[i], current[i]], type: gType, output: current[i] });
+        next.push(current[i]);
+      }
+    }
+    circuitLevels.push({ gates, type: gType });
+    current = next;
+  }
+}
+
+// -------- SVG DRAWING --------
+function drawCircuit() {
+  computeCircuit();
+  if (circuitLevels.length === 0) { document.getElementById("svgContainer").innerHTML = ""; return; }
+
+  const gateW = 70, gateH = 50;
+  const isNeg = t => t === "NAND" || t === "NOR" || t === "XNOR";
+  const gateOutOff = t => gateW/2 + (isNeg(t) ? 15 : 10);
+  const levelSpacing = 200;
+  const inputSpacing = Math.max(65, 500 / numInputs);
+  const startX = 80;
+  const svgW = startX + (numLevels + 1) * levelSpacing + 100;
+  const svgH = Math.max(400, numInputs * inputSpacing + 80);
+
+  const getInputY = i => {
+    const totalH = (numInputs - 1) * inputSpacing;
+    return (svgH - totalH) / 2 + i * inputSpacing;
+  };
+  const getGateY = (gi, total) => {
+    const sp = total > 1 ? (numInputs - 1) * inputSpacing / (total - 1) : 0;
+    const totalH = (total - 1) * sp;
+    return (svgH - totalH) / 2 + gi * sp;
+  };
+  const getLevelX = lv => startX + (lv + 1) * levelSpacing;
+
+  const lastLevel = circuitLevels[circuitLevels.length - 1];
+  const finalOut = lastLevel.gates[lastLevel.gates.length - 1]?.output;
+
+  let svg = `<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" style="min-width:100%">`;
+
+  // Dot grid
+  svg += `<defs>
+    <pattern id="dg" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="12" cy="12" r="1" fill="var(--border)" opacity="0.35"/>
+    </pattern>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="outglow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="inglow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>`;
+  svg += `<rect width="${svgW}" height="${svgH}" fill="url(#dg)"/>`;
+
+  // Wire helper -- orthogonal with small corner radius
+  function wireD(x1,y1,x2,y2) {
+    const r = 6;
+    const midX = (x1+x2)/2;
+    const dy = y2 - y1;
+    if (Math.abs(dy) < 1) return `M ${x1} ${y1} L ${x2} ${y2}`;
+    const sign = dy > 0 ? 1 : -1;
+    const cr = Math.min(r, Math.abs(dy)/2, Math.abs(midX-x1)/2);
+    return `M ${x1} ${y1} L ${midX-cr} ${y1} Q ${midX} ${y1}, ${midX} ${y1+sign*cr} L ${midX} ${y2-sign*cr} Q ${midX} ${y2}, ${midX+cr} ${y2} L ${x2} ${y2}`;
+  }
+  function drawWire(x1,y1,x2,y2,active) {
+    const col = active ? "var(--wire-active)" : "var(--wire-inactive)";
+    const d = wireD(x1,y1,x2,y2);
+    let s = `<path d="${d}" fill="none" stroke="${col}" stroke-width="${active?2:1.2}" opacity="${active?1:0.35}" stroke-linejoin="round"/>`;
+    if (active) s += `<path d="${d}" fill="none" stroke="${col}" stroke-width="6" opacity="0.1" stroke-linejoin="round"/>`;
+    return s;
+  }
+
+  // Wires: inputs -> first level
+  circuitLevels[0].gates.forEach((g, gi) => {
+    const gX = getLevelX(0);
+    const gY = getGateY(gi, circuitLevels[0].gates.length);
+    const idx1 = gi*2, idx2 = gi*2+1;
+    svg += drawWire(startX+22, getInputY(idx1), gX - gateW/2 - 10, gY - gateH*0.25, inputs[idx1]);
+    if (idx2 < inputs.length) {
+      svg += drawWire(startX+22, getInputY(idx2), gX - gateW/2 - 10, gY + gateH*0.25, inputs[idx2]);
+    }
+  });
+
+  // Wires: between levels
+  for (let li = 1; li < circuitLevels.length; li++) {
+    const prev = circuitLevels[li-1];
+    circuitLevels[li].gates.forEach((g, gi) => {
+      const cX = getLevelX(li), cY = getGateY(gi, circuitLevels[li].gates.length);
+      const pi1 = gi*2, pi2 = gi*2+1;
+      if (pi1 < prev.gates.length) {
+        svg += drawWire(getLevelX(li-1) + gateOutOff(prev.type) + 10, getGateY(pi1, prev.gates.length), cX - gateW/2 - 10, cY - gateH*0.25, prev.gates[pi1].output);
+      }
+      if (pi2 < prev.gates.length) {
+        svg += drawWire(getLevelX(li-1) + gateOutOff(prev.type) + 10, getGateY(pi2, prev.gates.length), cX - gateW/2 - 10, cY + gateH*0.25, prev.gates[pi2].output);
+      }
+    });
+  }
+
+  // Wire: last gate -> output
+  const lastGI = lastLevel.gates.length - 1;
+  const lastGX = getLevelX(circuitLevels.length - 1);
+  const lastGY = getGateY(lastGI, lastLevel.gates.length);
+  const outNodeX = getLevelX(circuitLevels.length) + 20;
+  svg += drawWire(lastGX + gateOutOff(lastLevel.type) + 10, lastGY, outNodeX - 30, svgH/2, finalOut);
+
+  // Input nodes
+  inputs.forEach((v, i) => {
+    const iy = getInputY(i);
+    const col = v ? "var(--signal-high)" : "var(--signal-low)";
+    svg += `<g class="input-node" data-index="${i}" style="cursor:pointer">`;
+    svg += `<circle cx="${startX}" cy="${iy}" r="20" fill="var(--gate-fill)" stroke="${col}" stroke-width="2.5" filter="url(#inglow)"/>`;
+    svg += `<text x="${startX}" y="${iy+5}" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="14" font-weight="700" fill="${col}">${v?1:0}</text>`;
+    svg += `<text x="${startX}" y="${iy-28}" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="10" fill="var(--fg-muted)">I${i}</text>`;
+    svg += `</g>`;
+  });
+
+  // Gate levels
+  circuitLevels.forEach((level, li) => {
+    const lx = getLevelX(li);
+    // Level label
+    svg += `<rect x="${lx-18}" y="8" width="36" height="18" rx="3" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="0.5"/>`;
+    svg += `<text x="${lx}" y="21" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="9" font-weight="700" fill="var(--fg-muted)">N${li+1}</text>`;
+
+    level.gates.forEach((g, gi) => {
+      const gx = lx, gy = getGateY(gi, level.gates.length);
+      const halfW = gateW/2;
+      const neg = isNeg(g.type);
+      const outX = gx + halfW + (neg ? 15 : 10);
+      const glowCol = g.output ? "var(--signal-high)" : "var(--signal-low)";
+
+      svg += drawGateSVGMarkup(g.type, gx, gy, gateW, gateH, false);
+
+      // Output LED
+      svg += `<circle cx="${outX+6}" cy="${gy}" r="6" fill="${glowCol}" filter="url(#glow)" opacity="0.9"/>`;
+      svg += `<circle cx="${outX+6}" cy="${gy}" r="3" fill="${g.output ? '#fff' : 'var(--gate-fill)'}" opacity="0.6"/>`;
+      // Output text
+      svg += `<text x="${outX+6}" y="${gy+18}" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="11" font-weight="700" fill="${glowCol}">${g.output?1:0}</text>`;
+    });
+  });
+
+  // Output node
+  const oCol = finalOut ? "var(--signal-high)" : "var(--signal-low)";
+  svg += `<circle cx="${outNodeX}" cy="${svgH/2}" r="28" fill="none" stroke="${oCol}" stroke-width="3" filter="url(#outglow)"/>`;
+  svg += `<circle cx="${outNodeX}" cy="${svgH/2}" r="22" fill="var(--gate-fill)" stroke="${oCol}" stroke-width="2"/>`;
+  svg += `<circle cx="${outNodeX}" cy="${svgH/2}" r="12" fill="${oCol}" opacity="0.3"/>`;
+  svg += `<circle cx="${outNodeX}" cy="${svgH/2}" r="6" fill="${oCol}" opacity="0.7"/>`;
+  svg += `<text x="${outNodeX}" y="${svgH/2-36}" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="11" font-weight="700" fill="var(--fg-muted)">SALIDA</text>`;
+  svg += `<text x="${outNodeX}" y="${svgH/2+6}" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="18" font-weight="700" fill="${oCol}">${finalOut?1:0}</text>`;
+
+  svg += `</svg>`;
+  document.getElementById("svgContainer").innerHTML = svg;
+
+  // Attach click handlers to input nodes
+  document.querySelectorAll(".input-node").forEach(node => {
+    node.addEventListener("click", () => {
+      const idx = parseInt(node.getAttribute("data-index"));
+      inputs[idx] = !inputs[idx];
+      render();
+    });
+  });
+}
+
+// -------- UI RENDERING --------
+function renderControls() {
+  // Level number
+  document.getElementById("levelNum").textContent = numLevels;
+  document.getElementById("levelInfo").textContent = numInputs + " entradas";
+  document.getElementById("btnDecLevel").disabled = numLevels <= 1;
+  document.getElementById("btnIncLevel").disabled = numLevels >= 5;
+
+  // Gate selects per level
+  const gs = document.getElementById("gateSelects");
+  gs.innerHTML = "";
+  for (let i = 0; i < numLevels; i++) {
+    const div = document.createElement("div");
+    div.className = "gate-select-group";
+    const lbl = document.createElement("label");
+    lbl.textContent = "Nivel " + (i+1);
+    const sel = document.createElement("select");
+    sel.style.width = "100px";
+    GATE_TYPES.forEach(gt => {
+      const opt = document.createElement("option");
+      opt.value = gt; opt.textContent = gt;
+      if (levelTypes[i] === gt) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener("change", () => { levelTypes[i] = sel.value; render(); });
+    div.appendChild(lbl);
+    div.appendChild(sel);
+    gs.appendChild(div);
+  }
+
+  // Inputs
+  document.getElementById("inputCount").textContent = numInputs;
+  const ig = document.getElementById("inputsGrid");
+  ig.innerHTML = "";
+  inputs.forEach((v, i) => {
+    const btn = document.createElement("button");
+    btn.className = "input-toggle " + (v ? "on" : "off");
+    btn.textContent = v ? "1" : "0";
+    btn.setAttribute("aria-label", "Entrada " + i + ": " + (v ? "1" : "0"));
+    btn.addEventListener("click", () => { inputs[i] = !inputs[i]; render(); });
+    ig.appendChild(btn);
+  });
+}
+
+function renderResults() {
+  if (circuitLevels.length === 0) {
+    document.getElementById("resultsRow").style.display = "none";
+    return;
+  }
+  document.getElementById("resultsRow").style.display = "flex";
+
+  // Partial
+  let partial = '<div class="panel-title">Resultados Parciales</div>';
+  circuitLevels.forEach((lv, li) => {
+    partial += `<div class="partial-level">`;
+    partial += `<span class="partial-label">N${li+1}</span>`;
+    partial += `<span class="partial-type">${lv.type}</span>`;
+    partial += `<div class="partial-gates">`;
+    lv.gates.forEach(g => {
+      const cls = g.output ? "on" : "off";
+      partial += `<div class="partial-gate"><span class="led ${cls}"></span><span class="partial-val ${cls}">${g.output?1:0}</span></div>`;
+    });
+    partial += `</div></div>`;
+  });
+  document.getElementById("partialResults").innerHTML = partial;
+
+  // Final
+  const fin = circuitLevels[circuitLevels.length - 1];
+  const fOut = fin.gates[fin.gates.length - 1]?.output;
+  const cls = fOut ? "on" : "off";
+  let fHtml = `<span class="panel-title" style="margin-bottom:0">Resultado Final</span>`;
+  fHtml += `<span class="final-led ${cls}"></span>`;
+  fHtml += `<span class="final-value ${cls}">${fOut?1:0}</span>`;
+  fHtml += `<span class="final-label ${cls}">${fOut?"VERDADERO":"FALSO"}</span>`;
+  const fp = document.getElementById("finalResult");
+  fp.className = "panel results-final final-panel " + cls;
+  fp.innerHTML = fHtml;
+}
+
+function render() {
+  renderControls();
+  drawCircuit();
+  renderResults();
+}
+
+// -------- EVENTS --------
+document.getElementById("btnDecLevel").addEventListener("click", () => {
+  if (numLevels > 1) { numLevels--; syncAfterLevelChange(); }
+});
+document.getElementById("btnIncLevel").addEventListener("click", () => {
+  if (numLevels < 5) { numLevels++; syncAfterLevelChange(); }
+});
+
+function syncAfterLevelChange() {
+  numInputs = Math.pow(2, numLevels);
+  // Adjust inputs
+  if (inputs.length < numInputs) {
+    inputs = inputs.concat(Array.from({length: numInputs - inputs.length}, () => Math.random() > 0.5));
+  } else {
+    inputs = inputs.slice(0, numInputs);
+  }
+  // Adjust levelTypes
+  while (levelTypes.length < numLevels) {
+    levelTypes.push(GATE_TYPES[levelTypes.length % GATE_TYPES.length]);
+  }
+  levelTypes = levelTypes.slice(0, numLevels);
+  render();
+}
+
+document.getElementById("allGatesSelect").addEventListener("change", function() {
+  const v = this.value;
+  if (v) {
+    levelTypes = levelTypes.map(() => v);
+    render();
+    this.selectedIndex = 0;
+  }
+});
+
+document.getElementById("btnAll1").addEventListener("click", () => { inputs = inputs.map(() => true); render(); });
+document.getElementById("btnAll0").addEventListener("click", () => { inputs = inputs.map(() => false); render(); });
+document.getElementById("btnRandom").addEventListener("click", () => { inputs = inputs.map(() => Math.random() > 0.5); render(); });
+
+// -------- INIT --------
+buildGateReference();
+render();
+</script>
+</body>
+</html>
