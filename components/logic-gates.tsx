@@ -232,6 +232,284 @@ export function OutputNode({ x, y, value }: { x: number; y: number; value: boole
   )
 }
 
+// ─── SR Flip-Flop ────────────────────────────────────────────────────────────
+
+interface FlipFlopProps {
+  x: number
+  y: number
+  width?: number
+  height?: number
+  q: boolean          // current Q state
+  s: boolean          // Set input
+  r: boolean          // Reset input
+  dragging?: boolean
+  onMouseDown?: (e: React.MouseEvent) => void
+  onTouchStart?: (e: React.TouchEvent) => void
+  onToggleS?: () => void
+  onToggleR?: () => void
+}
+
+export function FlipFlopSVG({
+  x, y,
+  width = 100, height = 80,
+  q, s, r,
+  dragging = false,
+  onMouseDown,
+  onTouchStart,
+  onToggleS,
+  onToggleR,
+}: FlipFlopProps) {
+  const qBar = !q
+  const hw = width / 2
+  const hh = height / 2
+
+  const bodyX = x - hw
+  const bodyY = y - hh
+
+  const colorQ    = q    ? "var(--signal-high)" : "var(--signal-low)"
+  const colorQBar = qBar ? "var(--signal-high)" : "var(--signal-low)"
+  const colorS    = s    ? "var(--signal-high)" : "var(--signal-low)"
+  const colorR    = r    ? "var(--signal-high)" : "var(--signal-low)"
+
+  // Pin offsets
+  const pinSY    = y - hh * 0.45   // S input (top-left)
+  const pinRY    = y + hh * 0.45   // R input (bottom-left)
+  const pinQY    = y - hh * 0.45   // Q output (top-right)
+  const pinQBarY = y + hh * 0.45   // Q̄ output (bottom-right)
+
+  const pinLen = 22
+
+  return (
+    <g
+      style={{ cursor: dragging ? "grabbing" : "grab", userSelect: "none" }}
+      onMouseDown={onMouseDown}
+      onTouchStart={onTouchStart}
+    >
+      <defs>
+        <filter id={`ff-glow-${x}-${y}`} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter id={`ff-glow-halo-${x}-${y}`} x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="6" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      {/* Outer glow when active */}
+      {q && (
+        <rect
+          x={bodyX - 4} y={bodyY - 4}
+          width={width + 8} height={height + 8}
+          rx={10} ry={10}
+          fill="none"
+          stroke="var(--signal-high)"
+          strokeWidth={1.5}
+          opacity={0.25}
+          filter={`url(#ff-glow-halo-${x}-${y})`}
+        />
+      )}
+
+      {/* Main body */}
+      <rect
+        x={bodyX} y={bodyY}
+        width={width} height={height}
+        rx={7} ry={7}
+        fill="var(--gate-fill)"
+        stroke={q ? "var(--signal-high)" : "var(--gate-stroke)"}
+        strokeWidth={2}
+        filter={`url(#ff-glow-${x}-${y})`}
+      />
+
+      {/* Title */}
+      <text
+        x={x} y={y - 6}
+        textAnchor="middle"
+        className="font-mono font-bold"
+        style={{ fontSize: "11px", fill: "var(--foreground)", pointerEvents: "none" }}
+      >
+        SR FF
+      </text>
+      <text
+        x={x} y={y + 8}
+        textAnchor="middle"
+        className="font-mono"
+        style={{ fontSize: "8px", fill: "var(--muted-foreground)", pointerEvents: "none" }}
+      >
+        Flip-Flop
+      </text>
+
+      {/* ── Input pins (left side) ── */}
+      {/* S pin */}
+      <line x1={bodyX - pinLen} y1={pinSY} x2={bodyX} y2={pinSY}
+        stroke={colorS} strokeWidth={s ? 2 : 1.2} opacity={s ? 1 : 0.4} />
+      {/* S toggle button */}
+      <circle
+        cx={bodyX - pinLen - 10} cy={pinSY} r={9}
+        fill={s ? "color-mix(in oklch, var(--signal-high) 18%, transparent)" : "var(--gate-fill)"}
+        stroke={colorS} strokeWidth={2}
+        style={{ cursor: "pointer" }}
+        onClick={(e) => { e.stopPropagation(); onToggleS?.() }}
+        onMouseDown={(e) => e.stopPropagation()}
+      />
+      <text
+        x={bodyX - pinLen - 10} y={pinSY + 4}
+        textAnchor="middle" className="font-mono font-bold"
+        style={{ fontSize: "10px", fill: colorS, pointerEvents: "none" }}
+      >
+        {s ? "1" : "0"}
+      </text>
+      {/* S label on body */}
+      <text
+        x={bodyX + 7} y={pinSY + 4}
+        textAnchor="start" className="font-mono font-bold"
+        style={{ fontSize: "9px", fill: "var(--muted-foreground)", pointerEvents: "none" }}
+      >
+        S
+      </text>
+
+      {/* R pin */}
+      <line x1={bodyX - pinLen} y1={pinRY} x2={bodyX} y2={pinRY}
+        stroke={colorR} strokeWidth={r ? 2 : 1.2} opacity={r ? 1 : 0.4} />
+      {/* R toggle button */}
+      <circle
+        cx={bodyX - pinLen - 10} cy={pinRY} r={9}
+        fill={r ? "color-mix(in oklch, var(--signal-high) 18%, transparent)" : "var(--gate-fill)"}
+        stroke={colorR} strokeWidth={2}
+        style={{ cursor: "pointer" }}
+        onClick={(e) => { e.stopPropagation(); onToggleR?.() }}
+        onMouseDown={(e) => e.stopPropagation()}
+      />
+      <text
+        x={bodyX - pinLen - 10} y={pinRY + 4}
+        textAnchor="middle" className="font-mono font-bold"
+        style={{ fontSize: "10px", fill: colorR, pointerEvents: "none" }}
+      >
+        {r ? "1" : "0"}
+      </text>
+      {/* R label on body */}
+      <text
+        x={bodyX + 7} y={pinRY + 4}
+        textAnchor="start" className="font-mono font-bold"
+        style={{ fontSize: "9px", fill: "var(--muted-foreground)", pointerEvents: "none" }}
+      >
+        R
+      </text>
+
+      {/* ── Output pins (right side) ── */}
+      {/* Q pin */}
+      <line x1={bodyX + width} y1={pinQY} x2={bodyX + width + pinLen} y2={pinQY}
+        stroke={colorQ} strokeWidth={q ? 2.5 : 1.2} opacity={q ? 1 : 0.35} />
+      {/* Q LED */}
+      <circle
+        cx={bodyX + width + pinLen + 8} cy={pinQY} r={7}
+        fill={colorQ} opacity={0.8}
+        filter={q ? `url(#ff-glow-${x}-${y})` : undefined}
+      />
+      <circle cx={bodyX + width + pinLen + 8} cy={pinQY} r={3.5}
+        fill={q ? "#fff" : "var(--gate-fill)"} opacity={0.6} />
+      {/* Q label on body */}
+      <text
+        x={bodyX + width - 7} y={pinQY + 4}
+        textAnchor="end" className="font-mono font-bold"
+        style={{ fontSize: "9px", fill: "var(--muted-foreground)", pointerEvents: "none" }}
+      >
+        Q
+      </text>
+      <text
+        x={bodyX + width + pinLen + 8} y={pinQY + 19}
+        textAnchor="middle" className="font-mono font-bold"
+        style={{ fontSize: "10px", fill: colorQ, pointerEvents: "none" }}
+      >
+        {q ? "1" : "0"}
+      </text>
+
+      {/* Q̄  pin (with negation bubble) */}
+      <line x1={bodyX + width} y1={pinQBarY} x2={bodyX + width + pinLen - 6} y2={pinQBarY}
+        stroke={colorQBar} strokeWidth={qBar ? 2.5 : 1.2} opacity={qBar ? 1 : 0.35} />
+      {/* Negation bubble */}
+      <circle
+        cx={bodyX + width + pinLen - 1} cy={pinQBarY} r={5}
+        fill="var(--gate-fill)" stroke={colorQBar} strokeWidth={1.5} opacity={qBar ? 1 : 0.5}
+      />
+      <line x1={bodyX + width + pinLen + 4} y1={pinQBarY} x2={bodyX + width + pinLen + 8} y2={pinQBarY}
+        stroke={colorQBar} strokeWidth={qBar ? 2.5 : 1.2} opacity={qBar ? 1 : 0.35} />
+      {/* Q̄ LED */}
+      <circle
+        cx={bodyX + width + pinLen + 15} cy={pinQBarY} r={7}
+        fill={colorQBar} opacity={0.8}
+        filter={qBar ? `url(#ff-glow-${x}-${y})` : undefined}
+      />
+      <circle cx={bodyX + width + pinLen + 15} cy={pinQBarY} r={3.5}
+        fill={qBar ? "#fff" : "var(--gate-fill)"} opacity={0.6} />
+      {/* Q̄ label on body */}
+      <text
+        x={bodyX + width - 7} y={pinQBarY + 4}
+        textAnchor="end" className="font-mono font-bold"
+        style={{ fontSize: "9px", fill: "var(--muted-foreground)", pointerEvents: "none" }}
+      >
+        Q̄
+      </text>
+      <text
+        x={bodyX + width + pinLen + 15} y={pinQBarY + 19}
+        textAnchor="middle" className="font-mono font-bold"
+        style={{ fontSize: "10px", fill: colorQBar, pointerEvents: "none" }}
+      >
+        {qBar ? "1" : "0"}
+      </text>
+
+      {/* Drag handle hint */}
+      <text
+        x={x} y={bodyY - 7}
+        textAnchor="middle"
+        style={{ fontSize: "7px", fill: "var(--muted-foreground)", opacity: 0.6, pointerEvents: "none" }}
+      >
+        ⠿ arrastrar
+      </text>
+    </g>
+  )
+}
+
+// Standalone icon for reference panel
+export function FlipFlopIcon({ size = 80 }: { size?: number }) {
+  const w = size
+  const h = size * 0.65
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+      {/* Simplified FF shape for icon */}
+      <rect x={w * 0.25} y={h * 0.1} width={w * 0.5} height={h * 0.8}
+        rx={5} fill="var(--gate-fill)" stroke="var(--gate-stroke)" strokeWidth={2} />
+      <text x={w * 0.5} y={h * 0.48} textAnchor="middle"
+        style={{ fontSize: `${size * 0.13}px`, fill: "var(--foreground)", fontFamily: "monospace", fontWeight: "bold" }}>
+        SR
+      </text>
+      <text x={w * 0.5} y={h * 0.67} textAnchor="middle"
+        style={{ fontSize: `${size * 0.1}px`, fill: "var(--muted-foreground)", fontFamily: "monospace" }}>
+        FF
+      </text>
+      {/* Input stubs */}
+      <line x1={w * 0.1} y1={h * 0.3} x2={w * 0.25} y2={h * 0.3}
+        stroke="var(--gate-stroke)" strokeWidth={1.5} />
+      <line x1={w * 0.1} y1={h * 0.7} x2={w * 0.25} y2={h * 0.7}
+        stroke="var(--gate-stroke)" strokeWidth={1.5} />
+      {/* Output stubs */}
+      <line x1={w * 0.75} y1={h * 0.3} x2={w * 0.9} y2={h * 0.3}
+        stroke="var(--signal-high)" strokeWidth={1.5} opacity={0.8} />
+      <line x1={w * 0.75} y1={h * 0.7} x2={w * 0.9} y2={h * 0.7}
+        stroke="var(--signal-low)" strokeWidth={1.5} opacity={0.8} />
+      <circle cx={w * 0.91} cy={h * 0.3} r={3.5} fill="var(--signal-high)" opacity={0.8} />
+      <circle cx={w * 0.92} cy={h * 0.7} r={5} fill="none"
+        stroke="var(--signal-low)" strokeWidth={1.5} opacity={0.6} />
+    </svg>
+  )
+}
+
 // Wire -- orthogonal routing with a small corner radius for a "technical" look
 export function Wire({
   x1, y1, x2, y2, active, horizontal = false,

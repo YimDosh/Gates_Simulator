@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useState, useMemo, useCallback, useEffect } from "react"
-import { LogicGateSVG, InputNode, OutputNode, Wire } from "./logic-gates"
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react"
+import { LogicGateSVG, InputNode, OutputNode, Wire, FlipFlopSVG } from "./logic-gates"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -38,6 +38,16 @@ function inputsForLevels(levels: number) {
   return Math.pow(2, levels)
 }
 
+// ── Flip-Flop state ──────────────────────────────────────────────────────────
+interface FFState {
+  q: boolean
+  s: boolean
+  r: boolean
+  pos: { x: number; y: number }
+  dragging: boolean
+  dragOffset: { dx: number; dy: number }
+}
+
 export function CircuitSimulator() {
   const [numLevels, setNumLevels] = useState(3)
   const numInputs = inputsForLevels(numLevels)
@@ -47,6 +57,89 @@ export function CircuitSimulator() {
   const [levelTypes, setLevelTypes] = useState<GateType[]>(() =>
     Array.from({ length: 3 }, (_, i) => GATE_TYPES[i % GATE_TYPES.length])
   )
+
+  // Flip-Flop
+  const [ff, setFF] = useState<FFState>({
+    q: false, s: false, r: false,
+    pos: { x: 200, y: 80 },
+    dragging: false,
+    dragOffset: { dx: 0, dy: 0 },
+  })
+  const svgRef = useRef<SVGSVGElement>(null)
+
+  // SR latch logic: update Q when S or R change
+  useEffect(() => {
+    setFF((prev) => {
+      if (prev.s && !prev.r) return { ...prev, q: true }   // Set
+      if (!prev.s && prev.r) return { ...prev, q: false }  // Reset
+      if (prev.s && prev.r)  return { ...prev, q: false }  // Invalid → 0
+      return prev                                           // Hold
+    })
+  }, [ff.s, ff.r])
+
+  const toggleFFInput = useCallback((pin: "s" | "r") => {
+    setFF((prev) => ({ ...prev, [pin]: !prev[pin] }))
+  }, [])
+
+  // Drag handlers
+  const onFFMouseDown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    const svg = svgRef.current
+    if (!svg) return
+    const pt = svg.createSVGPoint()
+    pt.x = e.clientX; pt.y = e.clientY
+    const svgP = pt.matrixTransform(svg.getScreenCTM()!.inverse())
+    setFF((prev) => ({
+      ...prev,
+      dragging: true,
+      dragOffset: { dx: svgP.x - prev.pos.x, dy: svgP.y - prev.pos.y },
+    }))
+  }, [])
+
+  const onSVGMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    setFF((prev) => {
+      if (!prev.dragging) return prev
+      const svg = svgRef.current
+      if (!svg) return prev
+      const pt = svg.createSVGPoint()
+      pt.x = e.clientX; pt.y = e.clientY
+      const svgP = pt.matrixTransform(svg.getScreenCTM()!.inverse())
+      return { ...prev, pos: { x: svgP.x - prev.dragOffset.dx, y: svgP.y - prev.dragOffset.dy } }
+    })
+  }, [])
+
+  const onSVGMouseUp = useCallback(() => {
+    setFF((prev) => prev.dragging ? { ...prev, dragging: false } : prev)
+  }, [])
+
+  // Touch drag
+  const onFFTouchStart = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation()
+    const svg = svgRef.current
+    if (!svg) return
+    const touch = e.touches[0]
+    const pt = svg.createSVGPoint()
+    pt.x = touch.clientX; pt.y = touch.clientY
+    const svgP = pt.matrixTransform(svg.getScreenCTM()!.inverse())
+    setFF((prev) => ({
+      ...prev,
+      dragging: true,
+      dragOffset: { dx: svgP.x - prev.pos.x, dy: svgP.y - prev.pos.y },
+    }))
+  }, [])
+
+  const onSVGTouchMove = useCallback((e: React.TouchEvent<SVGSVGElement>) => {
+    setFF((prev) => {
+      if (!prev.dragging) return prev
+      const svg = svgRef.current
+      if (!svg) return prev
+      const touch = e.touches[0]
+      const pt = svg.createSVGPoint()
+      pt.x = touch.clientX; pt.y = touch.clientY
+      const svgP = pt.matrixTransform(svg.getScreenCTM()!.inverse())
+      return { ...prev, pos: { x: svgP.x - prev.dragOffset.dx, y: svgP.y - prev.dragOffset.dy } }
+    })
+  }, [])
 
   useEffect(() => {
     const needed = inputsForLevels(numLevels)
@@ -144,6 +237,7 @@ export function CircuitSimulator() {
   const inputSpacing = Math.max(65, 500 / numInputs)
   const startX = 80
   const svgWidth = startX + (numLevels + 1) * levelSpacing + 100
+  // Extra height to give room for the draggable FF
   const svgHeight = Math.max(400, numInputs * inputSpacing + 80)
 
   // Input nodes are on the LEFT, spread vertically
@@ -317,12 +411,19 @@ export function CircuitSimulator() {
       {circuitLevels.length > 0 && (
         <div className="rounded-lg border border-border bg-card overflow-x-auto">
           <svg
+            ref={svgRef}
             width={svgWidth}
             height={svgHeight}
             viewBox={`0 0 ${svgWidth} ${svgHeight}`}
             className="min-w-full"
             role="img"
             aria-label="Diagrama del circuito logico"
+            onMouseMove={onSVGMouseMove}
+            onMouseUp={onSVGMouseUp}
+            onMouseLeave={onSVGMouseUp}
+            onTouchMove={onSVGTouchMove}
+            onTouchEnd={onSVGMouseUp}
+            style={{ cursor: ff.dragging ? "grabbing" : "default" }}
           >
             {/* Dot grid background */}
             <defs>
@@ -486,6 +587,20 @@ export function CircuitSimulator() {
                 value={finalOutput ?? false}
               />
             )}
+
+            {/* ── Draggable SR Flip-Flop ── */}
+            <FlipFlopSVG
+              x={ff.pos.x}
+              y={ff.pos.y}
+              q={ff.q}
+              s={ff.s}
+              r={ff.r}
+              dragging={ff.dragging}
+              onMouseDown={onFFMouseDown}
+              onTouchStart={onFFTouchStart}
+              onToggleS={() => toggleFFInput("s")}
+              onToggleR={() => toggleFFInput("r")}
+            />
           </svg>
         </div>
       )}
